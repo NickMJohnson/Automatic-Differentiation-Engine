@@ -70,13 +70,22 @@ class BackproppableArray(object):
         # depth-first search to find all dependencies of this array
         all_my_dependencies = self.all_dependencies()
 
-        # TODO: (1.2) implement the backward pass to compute the gradients
-        #   this should do the following
         #   (1) sort the found dependencies so that the ones computed last go FIRST
+        sorted_dependencies = sorted(all_my_dependencies, key=lambda x: x.order, reverse=True)
         #   (2) initialize and zero out all the gradient accumulators (.grad) for all the dependencies
+        for dep in sorted_dependencies:
+            dep.grad = np.zeros_like(dep.data)
         #   (3) set the gradient accumulator of this array to 1, as an initial condition
-        #           since the gradient of a number with respect to itself is 1
+        #           since the gradient of a number with respect to itself is 1'
+        self.grad = np.ones_like(self.data)
         #   (4) call the grad_fn function for all the dependencies in the sorted reverse order
+        for dep in sorted_dependencies:
+            dep.grad_fn()
+
+        
+
+        
+
 
     # function that is called to process a single step of backprop for this array
     # when called, it must be the case that self.grad contains the gradient of the loss (the
@@ -138,7 +147,7 @@ class BA_Add(BackproppableArray):
 
 # a class for an array that's the result of a subtraction operation
 class BA_Sub(BackproppableArray):
-    # x + y
+    # x - y
     def __init__(self, x, y):
         super().__init__(x.data - y.data, [x,y])
         self.x = x
@@ -146,7 +155,10 @@ class BA_Sub(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3, 2.3) implement grad fn for Sub
-        pass
+        # d(x-y)/dx = 1
+        self.x.grad += self.grad
+        # d(x-y)/dy = -1
+        self.y.grad -= self.grad
 
 # a class for an array that's the result of a multiplication operation
 class BA_Mul(BackproppableArray):
@@ -158,7 +170,10 @@ class BA_Mul(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3, 2.3) implement grad fn for Mul
-        pass
+        # d(x*y)/dx = y
+        self.x.grad += self.y.data * self.grad
+        # d(x*y)/dy = x
+        self.y.grad += self.x.data * self.grad
 
 # a class for an array that's the result of a division operation
 class BA_Div(BackproppableArray):
@@ -170,7 +185,10 @@ class BA_Div(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3, 2.3) implement grad fn for Div
-        pass
+        # d(x/y)/dx = (1/y)
+        self.x.grad = self.grad / self.y.data
+        # d(x/y)/dy = (-x/y^2)
+        self.y.grad = self.grad * (-self.x.data / (self.y.data ** 2))
 
 
 # a class for an array that's the result of a matrix multiplication operation
@@ -198,7 +216,8 @@ class BA_Exp(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3) implement grad fn for Exp
-        pass
+        # d(exp(x))/dx = exp(x)
+        self.x.grad += np.exp(self.x.data)* self.grad
 
 def exp(x):
     if isinstance(x, BackproppableArray):
@@ -215,7 +234,8 @@ class BA_Log(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3) implement grad fn for Log
-        pass
+        # d(log(x))/dx = 1/x
+        self.x.grad += (1.0 / self.x.data) * self.grad
 
 def log(x):
     if isinstance(x, BackproppableArray):
