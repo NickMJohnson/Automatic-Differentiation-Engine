@@ -474,4 +474,4 @@ if __name__ == "__main__":
 
     print("Part 2 (i.e., 2.4) tests (g1, g2) passed")
 
-    print("\n All tests are passed")
+    print("\n All the tests are passed")
