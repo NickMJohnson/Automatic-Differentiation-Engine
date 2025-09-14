@@ -59,8 +59,20 @@ class BackproppableArray(object):
     #     plus all the arrays those arrays depend on, plus all the arrays THOSE arrays depend on, et cetera
     # the returned list must only include each dependency ONCE
     def all_dependencies(self):
-        # TODO: (1.1) implement some sort of search to get all the dependencies
-        pass
+        # Boiler plate BFS for finding all dependencies, use of id for hashability/object comparison 
+        visited = set()
+        queue = [self]
+        all_deps = []
+        while queue:
+            current = queue.pop(0)
+            if id(current) in visited:
+                continue
+            visited.add(id(current))
+            all_deps.append(current)
+            for dep in current.dependencies:
+                if id(dep) not in visited:
+                    queue.append(dep)
+        return all_deps
 
     # compute gradients of this array with respect to everything it depends on
     def backward(self):
@@ -81,11 +93,6 @@ class BackproppableArray(object):
         #   (4) call the grad_fn function for all the dependencies in the sorted reverse order
         for dep in sorted_dependencies:
             dep.grad_fn()
-
-        
-
-        
-
 
     # function that is called to process a single step of backprop for this array
     # when called, it must be the case that self.grad contains the gradient of the loss (the
@@ -186,9 +193,9 @@ class BA_Div(BackproppableArray):
     def grad_fn(self):
         # TODO: (1.3, 2.3) implement grad fn for Div
         # d(x/y)/dx = (1/y)
-        self.x.grad = self.grad / self.y.data
+        self.x.grad += self.grad / self.y.data
         # d(x/y)/dy = (-x/y^2)
-        self.y.grad = self.grad * (-self.x.data / (self.y.data ** 2))
+        self.y.grad += self.grad * (-self.x.data / (self.y.data ** 2))
 
 
 # a class for an array that's the result of a matrix multiplication operation
@@ -311,8 +318,7 @@ class TestFxs(object):
 
     @staticmethod
     def df1dx(x):
-        # TODO (1.4) implement symbolic derivative of f1
-        pass
+        return 2.0
 
     @staticmethod
     def f2(x):
@@ -320,8 +326,7 @@ class TestFxs(object):
 
     @staticmethod
     def df2dx(x):
-        # TODO (1.4) implement symbolic derivative of f2
-        pass
+        return 2.0 * x
 
     @staticmethod
     def f3(x):
@@ -330,8 +335,8 @@ class TestFxs(object):
 
     @staticmethod
     def df3dx(x):
-        # TODO (1.4) implement symbolic derivative of f3
-        pass
+        u = x - 2.0
+        return (1.0 - u*u) / ((u*u + 1.0)**2)
 
     @staticmethod
     def f4(x):
@@ -359,11 +364,28 @@ class TestFxs(object):
         b = np.arange(5,dtype="float64")
         xb = x * b - 4
         return (xb * xb).sum().reshape(())
-
-    # TODO: Add any other test functions you want to use here
-    # END TODO
-
+    
 
 if __name__ == "__main__":
-    # TODO: Test your code using the provided test functions and your own functions
-    pass
+    print("Testing backprop implementation.")
+    
+    test_points = [0.0, 1.0, 2.0, -1.0, 3.5]
+    test_functions = [
+        ("f1", TestFxs.f1, TestFxs.df1dx),
+        ("f2", TestFxs.f2, TestFxs.df2dx), 
+        ("f3", TestFxs.f3, TestFxs.df3dx),
+        ("f4", TestFxs.f4, None)
+    ]
+    
+    for func_name, func, symbolic_deriv in test_functions:
+        for x in test_points:
+            num_deriv = numerical_diff(func, x)
+            auto_deriv = backprop_diff(func, x)
+
+            assert np.allclose(num_deriv, auto_deriv, atol=1e-5), f"{func_name}({x}): numerical={num_deriv}, auto={auto_deriv}"
+            
+            if symbolic_deriv is not None:
+                sym_deriv = symbolic_deriv(x)
+                assert np.allclose(sym_deriv, auto_deriv, atol=1e-10), f"{func_name}({x}): symbolic={sym_deriv}, auto={auto_deriv}"
+    
+    print("All tests passed.")
