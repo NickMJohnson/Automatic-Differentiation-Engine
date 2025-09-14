@@ -435,8 +435,8 @@ if __name__ == "__main__":
 
     for func_name, func, symbolic_deriv in test_functions_part1:
         for x in test_points_part1:
-            num_deriv  = numerical_diff(func, x)      # finite-diff (scalar x)
-            auto_deriv = backprop_diff(func, x)       # your autodiff (scalar x)
+            num_deriv  = numerical_diff(func, x)      # the finite-diff (scalar x)
+            auto_deriv = backprop_diff(func, x)       # the autodiff (scalar x)
 
             # numerical ~ backprop
             assert np.allclose(num_deriv, auto_deriv, atol=1e-5), \
