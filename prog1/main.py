@@ -124,7 +124,13 @@ class BackproppableArray(object):
     def __rtruediv__(self, other):
         return BA_Div(to_ba(other), self)
 
-    # TODO (2.2) Add operator overloading for matrix multiplication
+# (2.2) Adding operator overloading for matrix multiplication
+
+    def __matmul__(self, other):
+        return BA_MatMul(self, to_ba(other))
+
+    def __rmatmul__(self, other):
+        return BA_MatMul(to_ba(other), self)
 
     def sum(self, axis=None, keepdims=True):
         return BA_Sum(self, axis)
@@ -137,7 +143,15 @@ class BackproppableArray(object):
             axes = range(self.data.ndim)[::-1]
         return BA_Transpose(self, axes)
 
-# TODO: implement any helper functions you'll need to backprop through vectors
+# Implementing any helper functions you'll need to backprop through vectors
+def _unbroadcast_to(grad, shape):
+    g = grad
+    while g.ndim > len(shape):
+        g = g.sum(axis=0)
+    for axis, (gdim, sdim) in enumerate(zip(g.shape, shape)):
+        if sdim == 1 and gdim != 1:
+            g = g.sum(axis=axis, keepdims=True)
+    return g.reshape(shape)
 
 # a class for an array that's the result of an addition operation
 class BA_Add(BackproppableArray):
@@ -148,9 +162,14 @@ class BA_Add(BackproppableArray):
         self.y = y
 
     def grad_fn(self):
-        # TODO: (2.3) improve grad fn for Add
-        self.x.grad += self.grad
-        self.y.grad += self.grad
+        
+        # (1.3) improve grad fn for Add
+        # self.x.grad += self.grad
+        # self.y.grad += self.grad
+
+        # (2.3) improve grad fn for Add: broadcasting-aware accumulation
+        self.x.grad += _unbroadcast_to(self.grad, self.x.data.shape)
+        self.y.grad += _unbroadcast_to(self.grad, self.y.data.shape)
 
 # a class for an array that's the result of a subtraction operation
 class BA_Sub(BackproppableArray):
@@ -161,11 +180,16 @@ class BA_Sub(BackproppableArray):
         self.y = y
 
     def grad_fn(self):
-        # TODO: (1.3, 2.3) implement grad fn for Sub
+
+        # (1.3) implement grad fn for Sub
         # d(x-y)/dx = 1
-        self.x.grad += self.grad
+        # self.x.grad += self.grad
         # d(x-y)/dy = -1
-        self.y.grad -= self.grad
+        # self.y.grad -= self.grad
+
+        # (2.3) improve grad fn for Sub: broadcasting-aware accumulation
+        self.x.grad += _unbroadcast_to(self.grad, self.x.data.shape)
+        self.y.grad += _unbroadcast_to(-self.grad, self.y.data.shape)
 
 # a class for an array that's the result of a multiplication operation
 class BA_Mul(BackproppableArray):
@@ -176,11 +200,16 @@ class BA_Mul(BackproppableArray):
         self.y = y
 
     def grad_fn(self):
-        # TODO: (1.3, 2.3) implement grad fn for Mul
+    
+        # (1.3) implement grad fn for Mul
         # d(x*y)/dx = y
-        self.x.grad += self.y.data * self.grad
+        # self.x.grad += self.y.data * self.grad
         # d(x*y)/dy = x
-        self.y.grad += self.x.data * self.grad
+        # self.y.grad += self.x.data * self.grad
+
+        # (2.3) improve grad fn for Multiplication: broadcasting-aware accumulation
+        self.x.grad += _unbroadcast_to(self.grad * self.y.data, self.x.data.shape)
+        self.y.grad += _unbroadcast_to(self.grad * self.x.data, self.y.data.shape)
 
 # a class for an array that's the result of a division operation
 class BA_Div(BackproppableArray):
@@ -191,11 +220,15 @@ class BA_Div(BackproppableArray):
         self.y = y
 
     def grad_fn(self):
-        # TODO: (1.3, 2.3) implement grad fn for Div
+        # (1.3) implement grad fn for Div
         # d(x/y)/dx = (1/y)
-        self.x.grad += self.grad / self.y.data
+        # self.x.grad += self.grad / self.y.data
         # d(x/y)/dy = (-x/y^2)
-        self.y.grad += self.grad * (-self.x.data / (self.y.data ** 2))
+        # self.y.grad += self.grad * (-self.x.data / (self.y.data ** 2))
+
+        # (2.3) improve grad fn for Division: broadcasting-aware accumulation
+        self.x.grad += _unbroadcast_to(self.grad / self.y.data, self.x.data.shape)
+        self.y.grad += _unbroadcast_to(-self.grad * (self.x.data / (self.y.data ** 2)), self.y.data.shape)
 
 
 # a class for an array that's the result of a matrix multiplication operation
@@ -210,8 +243,11 @@ class BA_MatMul(BackproppableArray):
         self.y = y
 
     def grad_fn(self):
-        # TODO: (2.1) implement grad fn for MatMul
-        pass
+        # (2.1) implement grad fn for MatMul
+        self.x.grad += self.grad @ self.y.data.T
+        self.y.grad += self.x.data.T @ self.grad
+    
+pass
 
 
 # a class for an array that's the result of an exponential operation
@@ -222,7 +258,7 @@ class BA_Exp(BackproppableArray):
         self.x = x
 
     def grad_fn(self):
-        # TODO: (1.3) implement grad fn for Exp
+        # (1.3) implement grad fn for Exp
         # d(exp(x))/dx = exp(x)
         self.x.grad += np.exp(self.x.data)* self.grad
 
@@ -240,7 +276,7 @@ class BA_Log(BackproppableArray):
         self.x = x
 
     def grad_fn(self):
-        # TODO: (1.3) implement grad fn for Log
+        # (1.3) implement grad fn for Log
         # d(log(x))/dx = 1/x
         self.x.grad += (1.0 / self.x.data) * self.grad
 
@@ -262,8 +298,8 @@ class BA_Sum(BackproppableArray):
         self.axis = axis
 
     def grad_fn(self):
-        # TODO: (2.1) implement grad fn for Sum
-        pass
+        # (2.1) implement grad fn for Sum
+        self.x.grad += np.broadcast_to(self.grad, self.x.data.shape)
 
 # a class for an array that's the result of a reshape operation
 class BA_Reshape(BackproppableArray):
@@ -274,8 +310,8 @@ class BA_Reshape(BackproppableArray):
         self.shape = shape
 
     def grad_fn(self):
-        # TODO: (2.1) implement grad fn for Reshape
-        pass
+        # (2.1) implement grad fn for Reshape
+        self.x.grad += self.grad.reshape(self.x.data.shape)
 
 # a class for an array that's the result of a transpose operation
 class BA_Transpose(BackproppableArray):
@@ -286,8 +322,12 @@ class BA_Transpose(BackproppableArray):
         self.axes = axes
 
     def grad_fn(self):
-        # TODO: (2.1) implement grad fn for Transpose
-        pass
+        # (2.1) implement grad fn for Transpose
+        if self.axes is None:
+            self.x.grad += self.grad.transpose()
+        else:
+            inv = np.argsort(self.axes)
+            self.x.grad += self.grad.transpose(tuple(inv))
 
 
 # numerical derivative of scalar function f at x, using tolerance eps
@@ -310,6 +350,7 @@ def backprop_diff(f, x):
 
 
 # class to store test functions
+
 class TestFxs(object):
     # scalar-to-scalar tests
     @staticmethod
@@ -367,25 +408,70 @@ class TestFxs(object):
     
 
 if __name__ == "__main__":
-    print("Testing backprop implementation.")
     
-    test_points = [0.0, 1.0, 2.0, -1.0, 3.5]
-    test_functions = [
-        ("f1", TestFxs.f1, TestFxs.df1dx),
-        ("f2", TestFxs.f2, TestFxs.df2dx), 
-        ("f3", TestFxs.f3, TestFxs.df3dx),
-        ("f4", TestFxs.f4, None)
-    ]
-    
-    for func_name, func, symbolic_deriv in test_functions:
-        for x in test_points:
-            num_deriv = numerical_diff(func, x)
-            auto_deriv = backprop_diff(func, x)
+    """
+    Runs the provided Part 1 checks (f1..f4) & the Part 2 checks (g1, g2).
+    - Part 1 compares: symbolic vs backprop vs numerical_diff (for f1..f3) and
+      numerical_diff vs backprop (for f4).
+    - Part 2 (sub-part 2.4) compares: numerical_diff vs backprop on g1 and g2.
 
-            assert np.allclose(num_deriv, auto_deriv, atol=1e-5), f"{func_name}({x}): numerical={num_deriv}, auto={auto_deriv}"
-            
+    Notes:
+    * g1 and g2 are scalar to scalar functions that use vectors/matrices internally
+      (exercising broadcasting and @, transpose, reshape).
+    * For g2, x values where (x + b) == 0 for some integer b, are avoided because log(0) is undefined. 
+    """
+    
+    print("Testing backprop implementation.\n")
+
+    # ---------- Part 1: the original scalar tests ----------
+    
+    test_points_part1 = [0.0, 1.0, 2.0, -1.0, 3.5]
+    test_functions_part1 = [
+        ("f1", TestFxs.f1, TestFxs.df1dx),
+        ("f2", TestFxs.f2, TestFxs.df2dx),
+        ("f3", TestFxs.f3, TestFxs.df3dx),
+        ("f4", TestFxs.f4, None),  # numerical vs backprop only
+    ]
+
+    for func_name, func, symbolic_deriv in test_functions_part1:
+        for x in test_points_part1:
+            num_deriv  = numerical_diff(func, x)      # finite-diff (scalar x)
+            auto_deriv = backprop_diff(func, x)       # your autodiff (scalar x)
+
+            # numerical ~ backprop
+            assert np.allclose(num_deriv, auto_deriv, atol=1e-5), \
+                f"{func_name}({x}): numerical={num_deriv}, auto={auto_deriv}"
+
+            # (f1...f3) also check symbolic ~ backprop
             if symbolic_deriv is not None:
                 sym_deriv = symbolic_deriv(x)
-                assert np.allclose(sym_deriv, auto_deriv, atol=1e-10), f"{func_name}({x}): symbolic={sym_deriv}, auto={auto_deriv}"
+                assert np.allclose(sym_deriv, auto_deriv, atol=1e-10), \
+                    f"{func_name}({x}): symbolic={sym_deriv}, auto={auto_deriv}"
+
+    print("All Part 1 tests passed \n")
+
+    # ---------- Part 2: (especially 2.4) numerical vs backprop on g1, g2 ----------
     
-    print("All tests passed.")
+    # g1/g2 are scalar to scalar but include vectors/matrices internally:
+    # g1: tests elementwise ops + broadcasting through a sum
+    # g2: tests broadcasting + reshape + transpose + @ + sum
+    #
+    # Choosing 'safe' test points for g2 to avoid log(0) at (x + b) == 0:
+    
+    test_points_part2 = [0.3, 1.1, 2.7, -0.8]  
+
+    test_functions_part2 = [
+        ("g1", TestFxs.g1),  # numerical vs backprop
+        ("g2", TestFxs.g2),  # numerical vs backprop
+    ]
+
+    for func_name, func in test_functions_part2:
+        for x in test_points_part2:
+            num_deriv  = numerical_diff(func, x)     # central finite difference at x
+            auto_deriv = backprop_diff(func, x)      # backprop at x
+            assert np.allclose(num_deriv, auto_deriv, atol=1e-5), \
+                f"{func_name}({x}): numerical={num_deriv}, auto={auto_deriv}"
+
+    print("Part 2 (i.e., 2.4) tests (g1, g2) passed")
+
+    print("\n All tests are passed")
