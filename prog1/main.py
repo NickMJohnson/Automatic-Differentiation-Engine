@@ -338,7 +338,28 @@ def numerical_grad(f, x, eps=1e-5):
     # TODO: (2.5) implement numerical gradient function
     #       this should compute the gradient by applying something like
     #       numerical_diff independently for each entry of the input x
-    pass
+    """
+    Central-difference numerical gradient for vector (or any ndarray-shaped) inputs.
+    Returns an ndarray with the same shape as x.
+    """
+    x = np.asarray(x, dtype="float64")
+    grad = np.zeros_like(x, dtype="float64")
+
+    # Loop over inc in x
+    for idx in np.ndindex(*x.shape):
+        x_plus  = x.copy(); x_plus[idx]  += eps
+        x_minus = x.copy(); x_minus[idx] -= eps
+        f_plus  = f(x_plus)
+        f_minus = f(x_minus)
+
+        # Get data from backprop array 
+        if isinstance(f_plus, BackproppableArray):  f_plus = f_plus.data
+        if isinstance(f_minus, BackproppableArray): f_minus = f_minus.data
+
+        # Apply numerical diff formula
+        grad[idx] = (np.asarray(f_plus).reshape(()) - np.asarray(f_minus).reshape(())) / (2.0 * eps)
+
+    return grad
 
 # automatic derivative of scalar function f at x, using backprop
 def backprop_diff(f, x):
@@ -405,6 +426,21 @@ class TestFxs(object):
         b = np.arange(5,dtype="float64")
         xb = x * b - 4
         return (xb * xb).sum().reshape(())
+    
+    #  High dimension function test
+    # f(x) = log( 1 + sum( (x - b)^2 ) + (x^T A x) )
+    @staticmethod
+    def hi_dim_f(A, b):
+        """Return a scalar-valued f(x) that works for either np.ndarray or BackproppableArray x."""
+        def f(x):
+            xb = x - b                     
+            quad = (xb * xb).sum()       
+
+            xr = x.reshape((1, -1))
+            xrAx = (xr @ A @ xr.transpose()).reshape(())  
+
+            return log(1.0 + quad + xrAx).reshape(())
+        return f
     
 
 if __name__ == "__main__":
@@ -473,5 +509,46 @@ if __name__ == "__main__":
                 f"{func_name}({x}): numerical={num_deriv}, auto={auto_deriv}"
 
     print("Part 2 (i.e., 2.4) tests (g1, g2) passed")
+
+        # ---------- Part 2.6: numerical_grad (vector) vs backprop on fn h1 -------
+    rng = np.random.default_rng(0)
+    x_vec = rng.normal(size=5).astype("float64")
+
+    num_g = numerical_grad(TestFxs.h1, x_vec)
+    back_g = backprop_diff(TestFxs.h1, x_vec)
+
+    assert np.allclose(num_g, back_g, atol=1e-5), \
+        f"Part 2.6 mismatch:\n numerical_grad={num_g}\n backprop={back_g}"
+    print("numerical_grad = {num_g}\n backprop = {back_g}")
+    print("Part 2.6 test on h1 passed")
+
+     # ---------- Part 2.7: high-dim function & timing -------
+    import time
+
+    d = 1000
+    rng = np.random.default_rng(42)
+    x0 = rng.normal(size=d).astype("float64")
+    b  = np.linspace(-1.0, 1.0, d, dtype="float64")
+    A  = np.diag(0.1 + np.abs(rng.normal(size=d)).astype("float64"))
+
+    # Test function with d = 1000
+    f_hi = TestFxs.hi_dim_f(A, b)
+    #Compare time for numerical_grad
+    t0 = time.perf_counter()
+    num_g_hi = numerical_grad(f_hi, x0)
+    t1 = time.perf_counter()
+
+    # Compare time for backprop_diff
+    t2 = time.perf_counter()
+    back_g_hi = backprop_diff(f_hi, x0)
+    t3 = time.perf_counter()
+
+    assert np.allclose(num_g_hi, back_g_hi, atol=1e-4), \
+        "2.7 mismatch between numerical grad and backprop grad for high dim funciton"
+
+    print(f"Part 2.7 pass, d={d}")
+    print(f"  numerical_grad - {t1 - t0:.3f} s")
+    print(f"  backprop - {t3 - t2:.3f} s")
+
 
     print("\n All the tests are passed")
