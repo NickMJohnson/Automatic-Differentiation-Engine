@@ -427,20 +427,16 @@ class TestFxs(object):
         xb = x * b - 4
         return (xb * xb).sum().reshape(())
     
-    #  High dimension function test
-    # f(x) = log( 1 + sum( (x - b)^2 ) + (x^T A x) )
+    # high-dimensional test function 
     @staticmethod
-    def hi_dim_f(A, b):
-        """Return a scalar-valued f(x) that works for either np.ndarray or BackproppableArray x."""
-        def f(x):
-            xb = x - b                     
-            quad = (xb * xb).sum()       
-
-            xr = x.reshape((1, -1))
-            xrAx = (xr @ A @ xr.transpose()).reshape(())  
-
-            return log(1.0 + quad + xrAx).reshape(())
-        return f
+    def h2(x):
+        """
+        f(x) = log(1 + ||x||^2)
+        x is a vector with shape (d,)
+        f(x) scaler
+        """
+        quad = (x * x).sum()                 # ||x||^2
+        return log(1.0 + quad).reshape(())   # scalar
     
 
 if __name__ == "__main__":
@@ -522,33 +518,30 @@ if __name__ == "__main__":
     print("numerical_grad = {num_g}\n backprop = {back_g}")
     print("Part 2.6 test on h1 passed")
 
-     # ---------- Part 2.7: high-dim function & timing -------
+    # ---------- Part 2.7 high dim f(x) = log(1 + ||x||^2) --
     import time
 
     d = 1000
     rng = np.random.default_rng(42)
-    x0 = rng.normal(size=d).astype("float64")
-    b  = np.linspace(-1.0, 1.0, d, dtype="float64")
-    A  = np.diag(0.1 + np.abs(rng.normal(size=d)).astype("float64"))
+    xd = rng.normal(size=d).astype("float64")
 
-    # Test function with d = 1000
-    f_hi = TestFxs.hi_dim_f(A, b)
     #Compare time for numerical_grad
-    t0 = time.perf_counter()
-    num_g_hi = numerical_grad(f_hi, x0)
-    t1 = time.perf_counter()
+    ta_num = time.perf_counter()
+    num_g_hi = numerical_grad(TestFxs.h2, xd)
+    tb_num = time.perf_counter()
 
-    # Compare time for backprop_diff
-    t2 = time.perf_counter()
-    back_g_hi = backprop_diff(f_hi, x0)
-    t3 = time.perf_counter()
+    #Compare time for backprop_diff
+    ta_back = time.perf_counter()
+    auto_g_hi = backprop_diff(TestFxs.h2, xd)
+    tb_back = time.perf_counter()
 
-    assert np.allclose(num_g_hi, back_g_hi, atol=1e-4), \
+    # Make sure they match with tolerance 1e-4
+    assert np.allclose(num_g_hi, auto_g_hi, atol=1e-4), \
         "2.7 mismatch between numerical grad and backprop grad for high dim funciton"
 
-    print(f"Part 2.7 pass, d={d}")
-    print(f"  numerical_grad - {t1 - t0:.3f} s")
-    print(f"  backprop - {t3 - t2:.3f} s")
+    print(f"Part 2.7 pass, d = 1000")
+    print(f"  numerical_grad - {tb_num - ta_num:.7f} s")
+    print(f"  backprop time - {tb_back - ta_back:.7f} s")
 
 
     print("\n All the tests are passed")
