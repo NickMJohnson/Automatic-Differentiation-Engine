@@ -246,8 +246,6 @@ class BA_MatMul(BackproppableArray):
         # (2.1) implement grad fn for MatMul
         self.x.grad += self.grad @ self.y.data.T
         self.y.grad += self.x.data.T @ self.grad
-    
-pass
 
 
 # a class for an array that's the result of an exponential operation
@@ -285,9 +283,6 @@ def log(x):
         return BA_Log(x)
     else:
         return np.log(x)
-
-# TODO: Add your own function
-# END TODO
 
 # a class for an array that's the result of a sum operation
 class BA_Sum(BackproppableArray):
@@ -335,7 +330,7 @@ def numerical_diff(f, x, eps=1e-5):
     return (f(x + eps) - f(x - eps))/(2*eps)
 
 def numerical_grad(f, x, eps=1e-5):
-    # TODO: (2.5) implement numerical gradient function
+    # (2.5) implement numerical gradient function
     #       this should compute the gradient by applying something like
     #       numerical_diff independently for each entry of the input x
     """
@@ -357,7 +352,7 @@ def numerical_grad(f, x, eps=1e-5):
         if isinstance(f_minus, BackproppableArray): f_minus = f_minus.data
 
         # Apply numerical diff formula
-        grad[idx] = (np.asarray(f_plus).reshape(()) - np.asarray(f_minus).reshape(())) / (2.0 * eps)
+        grad[idx] = (np.asarray(f_plus).item() - np.asarray(f_minus).item()) / (2.0 * eps)
 
     return grad
 
@@ -367,7 +362,6 @@ def backprop_diff(f, x):
     fx = f(ba_x)
     fx.backward()
     return ba_x.grad
-
 
 
 # class to store test functions
@@ -430,13 +424,7 @@ class TestFxs(object):
     # high-dimensional test function 
     @staticmethod
     def h2(x):
-        """
-        f(x) = log(1 + ||x||^2)
-        x is a vector with shape (d,)
-        f(x) scaler
-        """
-        quad = (x * x).sum()                 # ||x||^2
-        return log(1.0 + quad).reshape(())   # scalar
+        return log(1.0 + (x * x * x * x * x * x * x * x).sum()).reshape(())
     
 
 if __name__ == "__main__":
@@ -506,7 +494,7 @@ if __name__ == "__main__":
 
     print("Part 2 (i.e., 2.4) tests (g1, g2) passed")
 
-        # ---------- Part 2.6: numerical_grad (vector) vs backprop on fn h1 -------
+    # ---------- Part 2.6: numerical_grad (vector) vs backprop on fn h1 -------
     rng = np.random.default_rng(0)
     x_vec = rng.normal(size=5).astype("float64")
 
