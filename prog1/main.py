@@ -445,7 +445,7 @@ if __name__ == "__main__":
 
     # ---------- Part 1: the original scalar tests ----------
     
-    test_points_part1 = [0.0, 1.0, 2.0, -1.0, 3.5]
+    test_points_part1 = [-10.0, -2.0 -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 10.0]
     test_functions_part1 = [
         ("f1", TestFxs.f1, TestFxs.df1dx),
         ("f2", TestFxs.f2, TestFxs.df2dx),
@@ -503,7 +503,7 @@ if __name__ == "__main__":
 
     assert np.allclose(num_g, back_g, atol=1e-5), \
         f"Part 2.6 mismatch:\n numerical_grad={num_g}\n backprop={back_g}"
-    print("numerical_grad = {num_g}\n backprop = {back_g}")
+    print(f"numerical_grad = {num_g}\n backprop = {back_g}")
     print("Part 2.6 test on h1 passed")
 
     # ---------- Part 2.7 high dim f(x) = log(1 + ||x||^2) --
