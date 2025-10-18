@@ -206,7 +206,7 @@ if __name__ == "__main__":
 	if torch.cuda.is_available():
 		end_time.record()
 		torch.cuda.synchronize()
-		gpu_time = start_time.elapsed_time(end_time) / 1000.0  # Convert to seconds
+		gpu_time = start_time.elapsed_time(end_time) / 1000.0
 		print(f"SGD GPU time: {gpu_time:.2f} seconds")
 	print(f"SGD Wall time: {end_wall_time - start_wall_time:.2f} seconds")
 	
