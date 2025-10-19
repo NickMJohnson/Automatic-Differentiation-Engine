@@ -310,7 +310,7 @@ def part2_1_grid_alpha_momentum(train_dataset, test_dataset, base_model_fn, mome
     return results, best
 
 ################################################################
-# 2.2 General Grid Search (picking 3 hyperparams form part 1)
+# 2.2 General Grid Search (picking 3 hyperparams from part 1)
 ################################################################
 
 def part2_2_grid_search(train_dataset, test_dataset, base_model_fn, epochs=5, seed=42):
