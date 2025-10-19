@@ -19,7 +19,7 @@ epochs = 10
 mnist_input_shape = (28, 28, 1)
 d1 = 1024
 d2 = 256
-alpha = 0.1
+alpha = 0.001
 beta = 0.9
 alpha_adam = 0.001
 rho1 = 0.99
@@ -80,6 +80,7 @@ def evaluate_model(dataloader, model, loss_fn):
 	total_loss, correct, total = 0.0, 0, 0
 
 	for _, (data, target) in enumerate(dataloader):
+		data, target = data.to(device), target.to(device)
 		output = model(data)
 		total_loss += loss_fn(output, target).item()		
 		correct += (output.argmax(dim=1) == target).sum().item()
@@ -125,8 +126,32 @@ def make_fully_connected_model_part1_4():
 #
 # returns   a new model of type torch.nn.Sequential
 def make_cnn_model_part3_1():
-	pass
-	# TODO students should implement this
+	model = torch.nn.Sequential(
+        torch.nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), padding=0, stride=1),
+        torch.nn.BatchNorm2d(16),
+        torch.nn.ReLU(),
+        torch.nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), padding=0, stride=1),
+        torch.nn.BatchNorm2d(16),
+        torch.nn.ReLU(),
+        torch.nn.MaxPool2d(kernel_size=(2, 2)),
+        torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), padding=0, stride=1),
+        torch.nn.BatchNorm2d(32),
+        torch.nn.ReLU(),
+        torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), padding=0, stride=1),
+        torch.nn.BatchNorm2d(32),
+        torch.nn.ReLU(),
+        torch.nn.MaxPool2d(kernel_size=(2, 2)),
+        torch.nn.Flatten(),
+        torch.nn.Linear(in_features=512, out_features=128),
+        torch.nn.ReLU(),
+        torch.nn.Linear(in_features=128, out_features=num_classes)
+    )
+	return model
+
+# build a convolutional neural network that improves upon the model from 3.1
+#
+# returns   a new model of type torch.nn.Sequential
+
 
 # train a neural network on MNIST data
 #     be sure to call model.train() before training and model.eval() before evaluating!
@@ -154,6 +179,7 @@ def train(train_dataloader, test_dataloader, model, loss_fn, optimizer, epochs, 
 		model.train()
 		epoch_loss, epoch_correct, epoch_total = 0.0, 0, 0
 		for _, (data, target) in enumerate(train_dataloader):
+			data, target = data.to(device), target.to(device)
 			output = model(data)
 			loss = loss_fn(output, target)
 			optimizer.zero_grad()
@@ -188,8 +214,10 @@ if __name__ == "__main__":
 	torch.manual_seed(42)
 	loss_fn = torch.nn.CrossEntropyLoss()
 
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 	print("Training with SGD:")
-	model_sgd = make_fully_connected_model_part1_1()
+	model_sgd = make_fully_connected_model_part1_1().to(device)
 	optimizer_sgd = torch.optim.SGD(model_sgd.parameters(), lr=alpha)
 	start_time = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
 	end_time = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
@@ -200,7 +228,7 @@ if __name__ == "__main__":
 	start_wall_time = time.time()
 	
 	train_loss_sgd, train_acc_sgd, test_loss_sgd, test_acc_sgd, approx_tr_loss_sgd, approx_tr_acc_sgd = train(
-		train_dataloader, test_dataloader, model_sgd, loss_fn, optimizer_sgd, epochs)
+	train_dataloader, test_dataloader, model_sgd, loss_fn, optimizer_sgd, epochs)
 	
 	end_wall_time = time.time()
 	if torch.cuda.is_available():
@@ -211,7 +239,7 @@ if __name__ == "__main__":
 	print(f"SGD Wall time: {end_wall_time - start_wall_time:.2f} seconds")
 	
 	print("Training with Momentum SGD:")
-	model_momentum = make_fully_connected_model_part1_1()
+	model_momentum = make_fully_connected_model_part1_1().to(device)
 	optimizer_momentum = torch.optim.SGD(model_momentum.parameters(), lr=alpha, momentum=beta)
 	
 	start_wall_time = time.time()
@@ -221,7 +249,7 @@ if __name__ == "__main__":
 	print(f"Momentum SGD Wall time: {end_wall_time - start_wall_time:.2f} seconds")
 	
 	print("Training with Adam:")
-	model_adam = make_fully_connected_model_part1_1()
+	model_adam = make_fully_connected_model_part1_1().to(device)
 	optimizer_adam = torch.optim.Adam(model_adam.parameters(), lr=alpha_adam, betas=(rho1, rho2))
 	
 	start_wall_time = time.time()
@@ -231,7 +259,7 @@ if __name__ == "__main__":
 	print(f"Adam Wall time: {end_wall_time - start_wall_time:.2f} seconds")
 	
 	print("Training with Batch Normalization + SGD:")
-	model_bn = make_fully_connected_model_part1_4()
+	model_bn = make_fully_connected_model_part1_4().to(device)
 	optimizer_bn = torch.optim.SGD(model_bn.parameters(), lr=alpha_adam, momentum=beta)
 	
 	start_wall_time = time.time()
@@ -239,6 +267,31 @@ if __name__ == "__main__":
 		train_dataloader, test_dataloader, model_bn, loss_fn, optimizer_bn, epochs)
 	end_wall_time = time.time()
 	print(f"Batch Norm SGD Wall time: {end_wall_time - start_wall_time:.2f} seconds")
+
+	(train_dataloader, test_dataloader) = construct_dataloaders(train_dataset, test_dataset, batch_size)
+	print("Training with CNN + Adam")
+	model_cnn = make_cnn_model_part3_1()
+	model_cnn.to(device)
+	optimizer_cnn = torch.optim.Adam(model_cnn.parameters(), lr=alpha, betas=(rho1, rho2))
+	start_time = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
+	end_time = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
+	
+	if torch.cuda.is_available():
+		start_time.record()
+	import time
+	start_wall_time = time.time()
+
+	train_loss_cnn, train_acc_cnn, test_loss_cnn, test_acc_cnn, approx_tr_loss_cnn, approx_tr_acc_cnn= train(
+	train_dataloader, test_dataloader, model_cnn, loss_fn, optimizer_cnn, epochs)
+	
+	end_wall_time = time.time()
+	if torch.cuda.is_available():
+		end_time.record()
+		torch.cuda.synchronize()
+		gpu_time = start_time.elapsed_time(end_time) / 1000.0
+		print(f"CNN + Adam GPU time: {gpu_time:.2f} seconds")
+	else:
+		print(f"CNN + Adam Wall time: {end_wall_time - start_wall_time:.2f} seconds")
 	
 	epochs_range = range(1, epochs + 1)	
 	def plot_metrics(algorithm_name, approx_tr_loss, train_loss, test_loss, 
@@ -264,6 +317,29 @@ if __name__ == "__main__":
 		pyplot.legend()
 		pyplot.grid(True)
 		pyplot.savefig(f'{algorithm_name.lower().replace(" ", "_")}_accuracy.png', dpi=300, bbox_inches='tight')
+
+	def plot_metrics2(algorithm_name, approx_tr_loss, test_loss, 
+                     approx_tr_acc, test_acc, epochs_range):
+        
+		pyplot.figure(figsize=(10, 6))
+		pyplot.plot(epochs_range, approx_tr_loss, 'b-', label='Approx Training Loss (Minibatches)', linewidth=2)
+		pyplot.plot(epochs_range, test_loss, 'g-', label='Test Loss', linewidth=2)
+		pyplot.title(f'{algorithm_name} - Loss vs Epoch')
+		pyplot.xlabel('Epoch')
+		pyplot.ylabel('Loss')
+		pyplot.legend()
+		pyplot.grid(True)
+		pyplot.savefig(f'{algorithm_name.lower().replace(" ", "_").replace("(", "").replace(")", "")}_loss.png', dpi=300, bbox_inches='tight')
+			
+		pyplot.figure(figsize=(10, 6))
+		pyplot.plot(epochs_range, approx_tr_acc, 'b-', label='Approx Training Accuracy (Minibatches)', linewidth=2)
+		pyplot.plot(epochs_range, test_acc, 'g-', label='Test Accuracy', linewidth=2)
+		pyplot.title(f'{algorithm_name} - Accuracy vs Epoch')
+		pyplot.xlabel('Epoch')
+		pyplot.ylabel('Accuracy')
+		pyplot.legend()
+		pyplot.grid(True)
+		pyplot.savefig(f'{algorithm_name.lower().replace(" ", "_").replace("(", "").replace(")", "")}_accuracy.png', dpi=300, bbox_inches='tight')
 	
 	plot_metrics('SGD', approx_tr_loss_sgd, train_loss_sgd, test_loss_sgd, 
 	             approx_tr_acc_sgd, train_acc_sgd, test_acc_sgd, epochs_range)
@@ -277,8 +353,14 @@ if __name__ == "__main__":
 	plot_metrics('Batch Norm + SGD', approx_tr_loss_bn, train_loss_bn, test_loss_bn,
 	             approx_tr_acc_bn, train_acc_bn, test_acc_bn, epochs_range)
 	
+	plot_metrics2('CNN + Adam', approx_tr_loss_cnn, test_loss_cnn, 
+             approx_tr_acc_cnn, test_acc_cnn, epochs_range)
+	
 	print(f"Final Test Accuracies:")
 	print(f"SGD: {test_acc_sgd[-1]:.4f}")
 	print(f"Momentum SGD: {test_acc_momentum[-1]:.4f}")
 	print(f"Adam: {test_acc_adam[-1]:.4f}")
 	print(f"Batch Norm + SGD: {test_acc_bn[-1]:.4f}")
+	print(f"CNN + Adam: {test_acc_cnn[-1]:.4f}")
+
+
