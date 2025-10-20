@@ -310,11 +310,12 @@ def part2_1_grid_alpha_momentum(train_dataset, test_dataset, base_model_fn, mome
     return results, best
 
 ################################################################
-# 2.2 General Grid Search (picking 3 hyperparams from part 1)
+# 2.2 General Grid Search (picking 3 hyperparams form part 1)
 ################################################################
 
 def part2_2_grid_search(train_dataset, test_dataset, base_model_fn, epochs=5, seed=42):
-    
+
+    start_time = time.time()
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # defining grids
@@ -345,7 +346,10 @@ def part2_2_grid_search(train_dataset, test_dataset, base_model_fn, epochs=5, se
     best = max(results, key=lambda r: r["val_acc"])
     print(f"[2.2] Best: Alpha={best['alpha']}, Beta={best['momentum']}, wd={best['weight_decay']} (val_acc={best['val_acc']:.4f}, test_acc={best['test_acc']:.4f})")
     _save_csv(results, "part2_2_grid.csv")
-    return results, best
+    
+    total_time = time.time() - start_time
+    print(f"[2.2] Total grid search time: {total_time:.2f} seconds")
+    return results, best, total_time
 
 ##########################################
 # 2.3 Random search over the same space
@@ -362,6 +366,8 @@ def part2_3_random_search(train_dataset, test_dataset, base_model_fn, epochs=5, 
       - beta ~ uniform[0.8, 0.99]
       - weight_decay ~ {0.0, 1e-5, 1e-4, 1e-3}
     """
+
+    start_time = time.time()
     random.seed(seed)
     loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -392,7 +398,10 @@ def part2_3_random_search(train_dataset, test_dataset, base_model_fn, epochs=5, 
     best = max(results, key=lambda r: r["val_acc"])
     print(f"[2.3] Best random: Alpha={best['alpha']:.5f}, Beta={best['momentum']:.3f}, wd={best['weight_decay']} (val_acc={best['val_acc']:.4f}, test_acc={best['test_acc']:.4f})")
     _save_csv(results, "part2_3_random.csv")
-    return results, best
+
+    total_time = time.time() - start_time
+    print(f"[2.3] Total random search time: {total_time:.2f} seconds")
+    return results, best, total_time
 
 def run_part2_all(train_dataset, test_dataset, epochs_each=5):
     """
@@ -404,15 +413,17 @@ def run_part2_all(train_dataset, test_dataset, epochs_each=5):
     _, best_21 = part2_1_grid_alpha_momentum(train_dataset, test_dataset, base_model_fn, momentum=0.9, epochs=epochs_each)
 
     print("\n=== Part 2.2: Grid search over (alpha, momentum, weight_decay) ===")
-    _, best_22 = part2_2_grid_search(train_dataset, test_dataset, base_model_fn, epochs=epochs_each)
+    _, best_22, time_grid = part2_2_grid_search(train_dataset, test_dataset, base_model_fn, epochs=epochs_each)
 
     print("\n=== Part 2.3: Random search over same space (>=10 trials) ===")
-    _, best_23 = part2_3_random_search(train_dataset, test_dataset, base_model_fn, epochs=epochs_each, n_trials=15)
+    _, best_23, time_random = part2_3_random_search(train_dataset, test_dataset, base_model_fn, epochs=epochs_each, n_trials=15)
 
     print("\nSummary (best val):")
     print(f"  2.1 best: Alpha={best_21['alpha']}  Beta=0.9  test_acc={best_21['test_acc']:.4f}")
     print(f"  2.2 best: Alpha={best_22['alpha']}  Beta={best_22['momentum']}  wd={best_22['weight_decay']}  test_acc={best_22['test_acc']:.4f}")
     print(f"  2.3 best: Alpha={best_23['alpha']:.5f}  Beta={best_23['momentum']:.3f}  wd={best_23['weight_decay']}  test_acc={best_23['test_acc']:.4f}")
+    print(f"Grid search total time: {time_grid:.2f} seconds")
+    print(f"Random search total time: {time_random:.2f} seconds")
 
 if __name__ == "__main__":
     (train_dataset, test_dataset) = load_MNIST_dataset()
