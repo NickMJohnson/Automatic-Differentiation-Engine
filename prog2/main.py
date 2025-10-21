@@ -81,19 +81,24 @@ def construct_dataloaders(train_dataset, test_dataset, batch_size, shuffle_train
 #
 # returns       tuple of (loss, accuracy), both python floats
 @torch.no_grad()
-def evaluate_model(dataloader, model, loss_fn):
-	model.eval()
-	total_loss, correct, total = 0.0, 0, 0
+def evaluate_model(dataloader, model, loss_fn, device=None):
+    # Automatically detect device if not provided
+    if device is None:
+        device = next(model.parameters()).device
 
-	for _, (data, target) in enumerate(dataloader):
-		data, target = data.to(device), target.to(device)
-		output = model(data)
-		total_loss += loss_fn(output, target).item()		
-		correct += (output.argmax(dim=1) == target).sum().item()
-		total += target.size(0)
-	
-	average_loss, accuracy = total_loss / len(dataloader), correct / total
-	return (average_loss, accuracy)
+    model.eval()
+    total_loss, correct, total = 0.0, 0, 0
+
+    for _, (data, target) in enumerate(dataloader):
+        data, target = data.to(device), target.to(device)
+        output = model(data)
+        total_loss += loss_fn(output, target).item()
+        correct += (output.argmax(dim=1) == target).sum().item()
+        total += target.size(0)
+
+    average_loss = total_loss / len(dataloader)
+    accuracy = correct / total
+    return (average_loss, accuracy)
 
 # build a fully connected two-hidden-layer neural network for MNIST data, as in Part 1.1
 # use the default initialization for the parameters provided in PyTorch
@@ -432,16 +437,18 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    # Prefer CUDA, otherwise use Apple MPS if available, or else CPU.
-    device = (
-        torch.device("cuda")
-        if torch.cuda.is_available()
-        else (
-            torch.device("mps")
-            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-            else torch.device("cpu")
-        )
-    )
+    # While using MacBook Pro
+    #Prefer CUDA, otherwise use Apple MPS if available, or else CPU.
+    #device = (
+    #    torch.device("cuda")
+    #    if torch.cuda.is_available()
+    #    else (
+    #        torch.device("mps")
+    #        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    #        else torch.device("cpu")
+    #    )
+    #)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("Training with SGD:")
     model_sgd = make_fully_connected_model_part1_1().to(device)
