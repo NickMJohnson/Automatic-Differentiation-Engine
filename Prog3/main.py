@@ -85,7 +85,7 @@ class Olmo2Model(torch.nn.Module):
         self.logits = torch.zeros(config.vocab_size, dtype=config.torch_dtype) # last token logits
         # set bump allocator memory
 
-        bump_allocator_memory = 2 * (config.hidden_size * max_inputlen + 4 * config.hidden_size * config.intermediate_size + config.num_attention_heads * (cache_seqlen * (config.hidden_size // config.num_attention_heads)) * 2
+        bump_allocator_memory = 2 * (config.hidden_size * max_inputlen + 4 * config.hidden_size * config.intermediate_size + 2 * config.num_attention_heads * cache_seqlen * (config.hidden_size // config.num_attention_heads))
         self.alloc = BumpAllocator(int(bump_allocator_memory))
 
     # compute the forward pass of the model
@@ -196,9 +196,26 @@ class Olmo2Model(torch.nn.Module):
             self.apply_rope_(k)
 
             # attention scores
-            attn = self.alloc.alloc((cfg.num_attention_heads, n_tokens, n_tokens), dtype=torch.float32)
-            torch.bmm(q, k.transpose(1,2), out=attn)
-            attn.mul_(self.attn_scaling)
+            # compute attention scores in higher precision for stability
+            attn_fp32 = torch.bmm(
+                q.to(torch.float32),
+                k.transpose(1, 2).to(torch.float32)
+            )
+            attn_fp32.mul_(self.attn_scaling)
+
+            # safe softmax in float32
+            attn_max = attn_fp32.amax(dim=-1, keepdim=True)
+            attn_fp32.sub_(attn_max)
+            attn_fp32.exp_()
+            attn_sum = attn_fp32.sum(dim=-1, keepdim=True)
+            attn_fp32.div_(attn_sum)
+
+            # convert back to bfloat16 for subsequent ops
+            attn = self.alloc.alloc(
+                (cfg.num_attention_heads, n_tokens, n_tokens),
+                dtype=cfg.torch_dtype
+            )
+            attn.copy_(attn_fp32.to(cfg.torch_dtype))
 
             # safe softmax
             attn_max = attn.amax(dim=-1, keepdim=True)
