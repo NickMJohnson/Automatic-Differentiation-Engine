@@ -1,4 +1,4 @@
-# CS4787 — Principles of Large-Scale Machine Learning
+# Project for: Principles of Large-Scale Machine Learning @ Cornell 
 
 Each part builds a core ML system from the ground up, progressing from scalar autodiff to neural network training to LLM inference.
 
