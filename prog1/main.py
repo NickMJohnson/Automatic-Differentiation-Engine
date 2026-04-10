@@ -510,7 +510,7 @@ if __name__ == "__main__":
     import time
 
     d = 1000
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(15)
     xd = rng.normal(size=d).astype("float64")
 
     #Compare time for numerical_grad
